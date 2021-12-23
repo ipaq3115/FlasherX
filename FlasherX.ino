@@ -219,7 +219,10 @@ void read_ascii_line( Stream *serial, char *line, int maxbytes )
   while (nchar < maxbytes && !(c == '\n' || c == '\r')) {
     if (serial->available()) {
       c = serial->read();
-      line[nchar++] = c;
+      if((c == '\n' || c == '\r') && nchar == 0) // skip \r and/or \n from the last line
+        c = 0; // don't trigger a new line
+      else
+        line[nchar++] = c;
     }
   }
   line[nchar-1] = 0;	// null-terminate
