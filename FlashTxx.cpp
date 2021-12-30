@@ -374,7 +374,7 @@ int flash_write_block( uint32_t addr, char *data, uint32_t count )
       continue;						//     continue while()
     }							//   
     #if defined(__IMXRT1062__)				//   #if T4.x 4-byte
-      flash_write( (void*)addr, (void*)&buf, 4 );	//     flash_write()
+      ret = flash_write( (void*)addr, (void*)&buf, 4 );	//     flash_write()
     #elif (FLASH_WRITE_SIZE==4)				//   #elif T3.x 4-byte 
       ret = flash_word( addr, buf, 0, 0 );		//     flash_word()
     #elif (FLASH_WRITE_SIZE==8)				//   #elif T3.x 8-byte
@@ -546,8 +546,10 @@ FASTRUN static void flash_wait()
 }
 
 // write bytes into flash memory (which is already erased to 0xFF)
-FASTRUN void flash_write(void *addr, const void *data, uint32_t len)
+FASTRUN int flash_write(void *addr, const void *data, uint32_t len)
 {
+  // error if address is out of range
+  if(((uint32_t)addr) < FLASH_BASE_ADDR || ((uint32_t)addr) > (FLASH_BASE_ADDR - FLASH_RESERVE + FLASH_SIZE - FLASH_WRITE_SIZE)) return 1;
   __disable_irq();
   FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
   FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
@@ -564,7 +566,7 @@ FASTRUN void flash_write(void *addr, const void *data, uint32_t len)
   FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x32) | LUT1(ADDR_SDR, PINS1, 24); // 32 = quad write
   FLEXSPI_LUT61 = LUT0(WRITE_SDR, PINS4, 1);
   FLEXSPI_IPTXFCR = FLEXSPI_IPTXFCR_CLRIPTXF; // clear tx fifo
-  FLEXSPI_IPCR0 = (uint32_t)addr & 0x001FFFFF;
+  FLEXSPI_IPCR0 = (uint32_t)addr & 0x007FFFFF;
   FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15) | FLEXSPI_IPCR1_IDATSZ(len);
   FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
   const uint8_t *src = (const uint8_t *)data;
@@ -583,11 +585,14 @@ FASTRUN void flash_write(void *addr, const void *data, uint32_t len)
   }
   FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE | FLEXSPI_INTR_IPTXWE;
   flash_wait();
+  return 0;
 }
 
 // erase a 4K sector
-FASTRUN void flash_erase_sector(void *addr)
+FASTRUN int flash_erase_sector(void *addr)
 {
+  // error if address is out of range
+  if(((uint32_t)addr) < FLASH_BASE_ADDR || ((uint32_t)addr) > (FLASH_BASE_ADDR - FLASH_RESERVE + FLASH_SIZE - FLASH_SECTOR_SIZE)) return 1;
   __disable_irq();
   FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
   FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
@@ -602,12 +607,13 @@ FASTRUN void flash_erase_sector(void *addr)
   while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
   FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
   FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x20) | LUT1(ADDR_SDR, PINS1, 24); // 20 = sector erase
-  FLEXSPI_IPCR0 = (uint32_t)addr & 0x001FF000;
+  FLEXSPI_IPCR0 = (uint32_t)addr & 0x007FF000;
   FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
   FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
   while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
   FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
   flash_wait();
+  return 0;
 }
 
 #endif

@@ -117,8 +117,8 @@ void LMEM_CodeCacheClearAll(void);
 #include <stdint.h>     // uint32_t, etc.
 #include <WProgram.h>	// FASTRUN
 
-FASTRUN void flash_write( void *addr, const void *data, uint32_t len );
-FASTRUN void flash_erase_sector( void *addr );
+FASTRUN int flash_write( void *addr, const void *data, uint32_t len );
+FASTRUN int flash_erase_sector( void *addr );
 RAMFUNC int  flash_sector_not_erased( uint32_t address );
 
 #endif // __IMXRT1062__
